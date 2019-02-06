@@ -1,10 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
+	"golang.org/x/image/bmp"
+
 	"github.com/jacobsa/go-serial/serial"
+
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/qr"
 )
 
 var cmdCut = []byte{0x0c}
@@ -51,8 +57,7 @@ Data:
         /CN=openvpn.itkettle.org
 
       serial:
-        B7:ED:D8:49
-        9D:0A:35:14
+        B7:ED:D8:49:9D:0A:35:14
 
     X509v3 Basic Constraints:
       CA:TRUE
@@ -70,11 +75,33 @@ var options = serial.OpenOptions{
 }
 
 func main() {
-	initialize()
-	// someStuff()
-	printString(certString)
-	executeHex(cmdCut)
-	byeTune()
+	// initialize()
+	// // someStuff()
+	// printString(certString)
+	// executeHex(cmdCut)
+	// byeTune()
+	data := genDMXT()
+	buf := new(bytes.Buffer)
+	err := bmp.Encode(buf, data)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(buf.Bytes())
+}
+
+// Data buffer on the printer is 16KB
+// Check out pages 115 and 157 for uploading and printing pixels
+
+func genDMXT() barcode.Barcode {
+	// Create the barcode
+	qrCode, _ := qr.Encode("Hello World ougabouga", qr.M, qr.Auto)
+
+	// Scale the barcode to 200x200 pixels
+	qrCode, _ = barcode.Scale(qrCode, 200, 200)
+
+	return qrCode
 }
 
 func initialize() {
@@ -168,3 +195,4 @@ func printString(inputString string) {
 }
 
 // Check out https://github.com/grantae/certinfo
+// openssl x509 -in "$2" -text -noout -certopt no_pubkey,no_sigdump
