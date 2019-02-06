@@ -1,70 +1,16 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 
-	"golang.org/x/image/bmp"
-
 	"github.com/jacobsa/go-serial/serial"
-
-	"github.com/boombuler/barcode"
-	"github.com/boombuler/barcode/qr"
+	dmtx "itkettle.org/avanier/gorecptprint/lib"
 )
 
 var cmdCut = []byte{0x0c}
 var cmdSize0 = []byte{0x1d, 0x21, 0x00}
 var cmdSize1 = []byte{0x1d, 0x21, 0x01}
-
-var certString = `Certificate:
-
-Data:
-  Version: 3 (0x2)
-  Serial Number:
-    b7:ed:d8:49:9d:0a:35:14
-  Signature Algorithm:
-    sha256WithRSAEncryption
-  Issuer:
-    CN = openvpn.itkettle.org
-
-  Validity
-    Not Before:
-      Sep  2 21:04:07 2018 GMT
-    Not After :
-      Aug 30 21:04:07 2028 GMT
-
-  Subject:
-    CN = openvpn.itkettle.org
-
-  X509v3 extensions:
-    X509v3 Subject Key Identifier:
-      CF:5C:C7:44
-      2B:E8:69:CC
-      9C:28:C2:42
-      8F:4D:57:FE
-      07:BD:05:43
-
-    X509v3 Authority Key Identifier:
-      keyid
-        CF:5C:C7:44
-        2B:E8:69:CC
-        9C:28:C2:42
-        8F:4D:57:FE
-        07:BD:05:43
-
-      DirName:
-        /CN=openvpn.itkettle.org
-
-      serial:
-        B7:ED:D8:49:9D:0A:35:14
-
-    X509v3 Basic Constraints:
-      CA:TRUE
-
-    X509v3 Key Usage: 
-      Certificate Sign, CRL Sign
-`
 
 var options = serial.OpenOptions{
 	PortName:        "/dev/ttyS0",
@@ -80,29 +26,19 @@ func main() {
 	// printString(certString)
 	// executeHex(cmdCut)
 	// byeTune()
-	data := genDMXT()
-	buf := new(bytes.Buffer)
-	err := bmp.Encode(buf, data)
+	err, data := dmtx.GenDMXT()
 
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println(buf.Bytes())
+	// fmt.Println(buf.Bytes())
+	// pixelarray.Test()
+
 }
 
 // Data buffer on the printer is 16KB
 // Check out pages 115 and 157 for uploading and printing pixels
-
-func genDMXT() barcode.Barcode {
-	// Create the barcode
-	qrCode, _ := qr.Encode("Hello World ougabouga", qr.M, qr.Auto)
-
-	// Scale the barcode to 200x200 pixels
-	qrCode, _ = barcode.Scale(qrCode, 200, 200)
-
-	return qrCode
-}
 
 func initialize() {
 	var initCmds = []byte{

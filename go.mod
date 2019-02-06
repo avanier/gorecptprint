@@ -7,3 +7,5 @@ require (
 	golang.org/x/sys v0.0.0-20190201152629-afcc84fd7533 // indirect
 	golang.org/x/text v0.3.0 // indirect
 )
+
+replace itkettle.org/avanier/gorecptprint/lib => ./lib
