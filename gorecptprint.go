@@ -59,16 +59,17 @@ func getPixels(img image.Image) ([]byte, error) {
 	bounds := img.Bounds()
 	width, height := bounds.Max.X, bounds.Max.Y
 
-	var boolPixels [][]bool
+	var boolPixels [][]byte
 	for y := 0; y < height; y++ {
-		row := boolslice.New()
+		row := []bool
 		for x := 0; x < ((width / 8) + (( width % 8 ) + 8)) ; x++ { // always round to rows of 8 pixels
 			if x < width {
-				row = append(row, rgbaToPixel(img.At(x, y).RGBA()))
+				row = append(row, []bool{rgbaToPixel(img.At(x, y).RGBA())})
 			}	else {
-				row = append(row, false)
+				row = append(row, []bool{false})
 			}
 		}
+		boolPixels = append(boolPixels, row)
 		pixels = append(pixels, row)
 	}
 
