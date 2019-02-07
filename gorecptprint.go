@@ -7,6 +7,7 @@ import (
 	"github.com/jacobsa/go-serial/serial"
 	"itkettle.org/avanier/gorecptprint/lib/extras"
 	"itkettle.org/avanier/gorecptprint/lib/tf6"
+	boolslice "github.com/mkideal/pkg/container/boolslice"
 )
 
 var cmdCut = []byte{0x0c}
@@ -60,9 +61,13 @@ func getPixels(img image.Image) ([]byte, error) {
 
 	var boolPixels [][]bool
 	for y := 0; y < height; y++ {
-		var row []bool
-		for x := 0; x < width; x++ {
-			row = append(row, rgbaToPixel(img.At(x, y).RGBA()))
+		row := boolslice.New()
+		for x := 0; x < ((width / 8) + (( width % 8 ) + 8)) ; x++ { // always round to rows of 8 pixels
+			if x < width {
+				row = append(row, rgbaToPixel(img.At(x, y).RGBA()))
+			}	else {
+				row = append(row, false)
+			}
 		}
 		pixels = append(pixels, row)
 	}
