@@ -1,11 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"image"
 
+	"github.com/boombuler/barcode"
 	"github.com/jacobsa/go-serial/serial"
-	dmtx "itkettle.org/avanier/gorecptprint/lib"
+	"itkettle.org/avanier/gorecptprint/lib/extras"
+	"itkettle.org/avanier/gorecptprint/lib/tf6"
 )
 
 var cmdCut = []byte{0x0c}
@@ -21,20 +22,23 @@ var options = serial.OpenOptions{
 }
 
 func main() {
-	// initialize()
-	// // someStuff()
-	// printString(certString)
-	// executeHex(cmdCut)
-	// byeTune()
-	err, data := dmtx.GenDMXT()
+	initialize()
+	extras.PrintDummyGraphic(options)
+	tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
+	tf6.PrintString("Hello World", options)
+	tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
 
-	if err != nil {
-		panic(err)
-	}
+	dmtxCode := dataMatrixCode.Encode("Hello World")
+	dmtxCode, _ = barcode.Scale(dmtxCode, 432, 432) // 432 is 3 times 144
 
-	// fmt.Println(buf.Bytes())
-	// pixelarray.Test()
+	dmtxProps := tf6.GraphicProps{d: 2, w: dmtxCode.dimension, h: dmtxCode.dimension}
 
+	dmtxData := nil
+
+	tf6.PrintGraphic(dmtxProps, dmtxData)
+
+	tf6.ExecuteHex(cmdCut, options)
+	extras.ByeTune(options)
 }
 
 // Data buffer on the printer is 16KB
@@ -45,89 +49,31 @@ func initialize() {
 		0x1B, 0x40, // Reinitialize the printer <p.142>
 		0x1B, 0x43, 0xFF, // Set the number of feed lines before cut to 255 (FF) steps, default 160 (A0) <p.138>
 	}
-	executeHex(initCmds)
-	readyTune()
+	tf6.ExecuteHex(initCmds, options)
+	extras.ReadyTune(options)
 }
 
-func executeHex(b []byte) {
-	port, err := serial.Open(options)
-	if err != nil {
-		log.Fatalf("serial.Open: %v", err)
+// Converts an Image to a list of black and white pixels
+func getPixels(img image.Image) ([]byte, error) {
+	bounds := img.Bounds()
+	width, height := bounds.Max.X, bounds.Max.Y
+
+	var boolPixels [][]bool
+	for y := 0; y < height; y++ {
+		var row []bool
+		for x := 0; x < width; x++ {
+			row = append(row, rgbaToPixel(img.At(x, y).RGBA()))
+		}
+		pixels = append(pixels, row)
 	}
 
-	defer port.Close()
+	pixelList = []byte
 
-	_, err = port.Write(b)
-	if err != nil {
-		log.Fatalf("port.Write: %v", err)
-	}
+	return pixelList, nil
 }
 
-func readyTune() {
-	// Plays some beeps to signal end of initialization
-	// See <p.144>
-	var readyTune = []byte{
-		0x1b, 0x07, // Start the sequence
-		0x02, // Set the duration from 01 - FF times 0.1 seconds
-		0x90, // Binary conversion of 10010000 - (10)<soft>(01)<octave 2>(0000)<note c>
-		0x1b, 0x07,
-		0x01,
-		0x95,
-		0x1b, 0x07,
-		0x01,
-		0x99,
-	}
-	executeHex(readyTune)
-}
-
-func byeTune() {
-	var readyTune = []byte{
-		0x1b, 0x07,
-		0x02,
-		0x9a,
-		0x1b, 0x07,
-		0x01,
-		0x99,
-		0x1b, 0x07,
-		0x01,
-		0x95,
-	}
-	executeHex(readyTune)
-}
-
-func someStuff() {
-	// Open the port.
-	port, err := serial.Open(options)
-	if err != nil {
-		log.Fatalf("serial.Open: %v", err)
-	}
-
-	// Make sure to close it later.
-	defer port.Close()
-
-	b := append(cmdSize1, []byte("This is a string.\n")...)
-	b = append(b, cmdCut...)
-
-	n, err := port.Write(b)
-	if err != nil {
-		log.Fatalf("port.Write: %v", err)
-	}
-
-	fmt.Println("Wrote", n, "bytes.")
-}
-
-func printString(inputString string) {
-	port, err := serial.Open(options)
-	if err != nil {
-		log.Fatalf("serial.Open: %v", err)
-	}
-
-	defer port.Close()
-
-	_, err = port.Write([]byte(inputString))
-	if err != nil {
-		log.Fatalf("port.Write: %v", err)
-	}
+func rgbaToPixel(r uint32, g uint32, b uint32, a uint32) bool {
+	return bool(r != 0) && bool(g != 0) && bool(b != 0)
 }
 
 // Check out https://github.com/grantae/certinfo

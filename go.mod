@@ -8,4 +8,8 @@ require (
 	golang.org/x/text v0.3.0 // indirect
 )
 
-replace itkettle.org/avanier/gorecptprint/lib => ./lib
+replace itkettle.org/avanier/gorecptprint/lib/dmtx => ./dmtx
+
+replace itkettle.org/avanier/gorecptprint/lib/extras => ./extras
+
+replace itkettle.org/avanier/gorecptprint/lib/tf6 => ./tf6
