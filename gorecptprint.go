@@ -54,6 +54,11 @@ func initialize() {
 	extras.ReadyTune(options)
 }
 
+// NOTE TO SELF
+// Implement bwImage with dimensions automatically conformed to nearest 8 pixels
+// Allow it to take an Image type for conversion
+// Make it have dimensions properties and a hexdump instance method
+
 // Converts an Image to a list of black and white pixels
 func getPixels(img image.Image) ([]byte, error) {
 	bounds := img.Bounds()
