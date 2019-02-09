@@ -1,3 +1,9 @@
+# github.com/Workiva/go-datastructures v1.0.50
+github.com/Workiva/go-datastructures/bitarray
+# github.com/boombuler/barcode v1.0.0
+github.com/boombuler/barcode
+github.com/boombuler/barcode/datamatrix
+github.com/boombuler/barcode/utils
 # github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
 github.com/jacobsa/go-serial/serial
 # golang.org/x/sys v0.0.0-20190201152629-afcc84fd7533

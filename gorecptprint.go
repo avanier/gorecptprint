@@ -4,10 +4,12 @@ import (
 	"image"
 
 	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/datamatrix"
 	"github.com/jacobsa/go-serial/serial"
 	"itkettle.org/avanier/gorecptprint/lib/extras"
 	"itkettle.org/avanier/gorecptprint/lib/tf6"
-	boolslice "github.com/mkideal/pkg/container/boolslice"
+
+	"github.com/Workiva/go-datastructures/bitarray"
 )
 
 var cmdCut = []byte{0x0c}
@@ -23,18 +25,26 @@ var options = serial.OpenOptions{
 }
 
 func main() {
-	initialize()
-	extras.PrintDummyGraphic(options)
-	tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
-	tf6.PrintString("Hello World", options)
-	tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
+	// initialize()
+	// extras.PrintDummyGraphic(options)
+	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
+	// tf6.PrintString("Hello World", options)
+	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
 
-	dmtxCode := dataMatrixCode.Encode("Hello World")
+	dmtxCode, _ := datamatrix.Encode("Hello World")
 	dmtxCode, _ = barcode.Scale(dmtxCode, 432, 432) // 432 is 3 times 144
 
-	dmtxProps := tf6.GraphicProps{d: 2, w: dmtxCode.dimension, h: dmtxCode.dimension}
+	bounds := dmtxCode.Bounds
+	w := bounds.Max.X
+	h := bounds.Y
 
-	dmtxData := nil
+	dmtxProps := tf6.GraphicProps{
+		D: 2,
+		W: w,
+		H: h,
+	}
+
+	var dmtxData []byte
 
 	tf6.PrintGraphic(dmtxProps, dmtxData)
 
@@ -64,26 +74,51 @@ func getPixels(img image.Image) ([]byte, error) {
 	bounds := img.Bounds()
 	width, height := bounds.Max.X, bounds.Max.Y
 
-	var boolPixels [][]byte
+	var bytePixels []byte
 	for y := 0; y < height; y++ {
-		row := []bool
-		for x := 0; x < ((width / 8) + (( width % 8 ) + 8)) ; x++ { // always round to rows of 8 pixels
-			if x < width {
-				row = append(row, []bool{rgbaToPixel(img.At(x, y).RGBA())})
-			}	else {
-				row = append(row, []bool{false})
+		var row []bool
+		// all of this is double conversion and should be merged with boolSlice2byteSlice
+		for x := 0; x < ((width / 8) + ((width % 8) + 8)); x++ { // always round up to rows of 8 pixels
+			for a := 0; a < 8; a++ {
+				if x < width/8 || a <= width%8 {
+					row = append(row, []bool{rgbaToBW(img.At(x, y).RGBA())}...)
+				} else {
+					row = append(row, []bool{false}...)
+				}
 			}
 		}
-		boolPixels = append(boolPixels, row)
-		pixels = append(pixels, row)
+		byteList := boolSlice2byteSlice(row)
+		bytePixels = append(bytePixels, byteList...)
 	}
 
-	pixelList = []byte
+	var pixelList []byte
 
 	return pixelList, nil
 }
 
-func rgbaToPixel(r uint32, g uint32, b uint32, a uint32) bool {
+func boolSlice2byteSlice(s []bool) []byte {
+	var c []byte
+	for y := 0; y < (len(s) / 8); y++ {
+		var x, s []bool
+		if y < 7 {
+			x, s = s[y:(y*8)-1], s[(y*8):]
+		} else {
+			x = s[y : (y*8)-1]
+		}
+		var b = bitarray.NewBitArray(8)
+		var z uint64
+		for z = 0; z < 8; z++ {
+			if x[z] == true {
+				b.SetBit(z)
+			}
+		}
+		d, _ := bitarray.Marshal(b)
+		c = append(c, d...)
+	}
+	return c
+}
+
+func rgbaToBW(r uint32, g uint32, b uint32, a uint32) bool {
 	return bool(r != 0) && bool(g != 0) && bool(b != 0)
 }
 

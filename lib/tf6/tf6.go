@@ -7,9 +7,7 @@ import (
 )
 
 type GraphicProps struct {
-	d int16
-	w int16
-	h int16
+	D, W, H int16
 }
 
 func ExecuteHex(b []byte, options serial.OpenOptions) {
@@ -38,4 +36,8 @@ func PrintString(inputString string, options serial.OpenOptions) {
 	if err != nil {
 		log.Fatalf("port.Write: %v", err)
 	}
+}
+
+func PrintGraphic() {
+
 }
