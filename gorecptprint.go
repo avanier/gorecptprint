@@ -111,27 +111,31 @@ func getPixels(img image.Image) ([]byte, error) {
 
 func boolSlice2byteSlice(s []bool) []byte {
 	var c []byte
-	fmt.Println("length of current boolSlice: " + strconv.Itoa(len(s)))
+	fmt.Println("length of current boolSlice:", strconv.Itoa(len(s)), "bits")
 	for y := 0; y < (len(s) / 8); y++ {
 		fmt.Println("current slice range " + strconv.Itoa(y))
-		var x, s []bool
-		// I'm past Ballmer's peak, so this is garbage code
+		var x []bool
 		if y == 0 {
-			x = s[0:7]
-			s = s[8:]
+			fmt.Println("I'm in the first conditional")
+			x, s = s[0:7], s[8:]
 		} else if y < 7 {
+			fmt.Println("I'm in the second conditional")
 			x, s = s[y:(y*8)-1], s[(y*8):]
 		} else {
 			x = s[y : (y*8)-1]
 		}
 		var b = bitarray.NewBitArray(8)
-		var z uint64
-		for z = 0; z < 8; z++ {
+		for z := 0; z < 8; z++ {
+			fmt.Println("trying bit", strconv.Itoa(z), "of", len(x))
 			if x[z] == true {
-				b.SetBit(z)
+				fmt.Println("setting bit", strconv.Itoa(z), "to 1")
+				b.SetBit(uint64(z))
+			} else {
+				fmt.Println("setting bit", strconv.Itoa(z), "to 0")
 			}
 		}
 		d, _ := bitarray.Marshal(b)
+		fmt.Println("resulting byte: ", d)
 		c = append(c, d...)
 	}
 	return c
