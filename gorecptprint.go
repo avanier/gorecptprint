@@ -116,17 +116,15 @@ func boolSlice2byteSlice(s []bool) []byte {
 		fmt.Println("current slice range " + strconv.Itoa(y))
 		var x []bool
 		if y == 0 {
-			fmt.Println("I'm in the first conditional")
-			x, s = s[0:7], s[8:]
+			x, s = s[0:8], s[8:]
 		} else if y < 7 {
-			fmt.Println("I'm in the second conditional")
-			x, s = s[y:(y*8)-1], s[(y*8):]
+			x, s = s[y:(y*8)], s[(y*8):]
 		} else {
 			x = s[y : (y*8)-1]
 		}
-		var b = bitarray.NewBitArray(8)
+		var b = bitarray.NewBitArray(uint64(len(s))) // <- I'm pretty certain this is sketchy
 		for z := 0; z < 8; z++ {
-			fmt.Println("trying bit", strconv.Itoa(z), "of", len(x))
+			fmt.Println("trying bit", strconv.Itoa(z), "of", len(x)-1)
 			if x[z] == true {
 				fmt.Println("setting bit", strconv.Itoa(z), "to 1")
 				b.SetBit(uint64(z))
