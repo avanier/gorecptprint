@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"image"
+	"strconv"
 
-	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/datamatrix"
 	"github.com/jacobsa/go-serial/serial"
 	"itkettle.org/avanier/gorecptprint/lib/extras"
@@ -32,24 +33,26 @@ func main() {
 	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
 
 	dmtxCode, _ := datamatrix.Encode("Hello World")
-	dmtxCode, _ = barcode.Scale(dmtxCode, 432, 432) // 432 is 3 times 144
+	// dmtxCode, _ = barcode.Scale(dmtxCode, 432, 432) // 432 is 3 times 144
 
-	bounds := dmtxCode.Bounds
-	w := bounds.Max.X
-	h := bounds.Y
+	// bounds := dmtxCode.Bounds()
 
-	dmtxProps := tf6.GraphicProps{
-		D: 2,
-		W: w,
-		H: h,
-	}
+	// dmtxProps := tf6.GraphicProps{
+	// 	D: 2,
+	// 	W: int16(bounds.Max.X),
+	// 	H: int16(bounds.Max.Y),
+	// }
 
-	var dmtxData []byte
+	pixels, _ := getPixels(dmtxCode)
 
-	tf6.PrintGraphic(dmtxProps, dmtxData)
+	fmt.Println(pixels)
 
-	tf6.ExecuteHex(cmdCut, options)
-	extras.ByeTune(options)
+	// var dmtxData []byte
+
+	// tf6.PrintGraphic(dmtxProps, dmtxData)
+
+	// tf6.ExecuteHex(cmdCut, options)
+	// extras.ByeTune(options)
 }
 
 // Data buffer on the printer is 16KB
@@ -74,13 +77,23 @@ func getPixels(img image.Image) ([]byte, error) {
 	bounds := img.Bounds()
 	width, height := bounds.Max.X, bounds.Max.Y
 
+	fmt.Println("width: " + strconv.Itoa(width) + " pixels")
+
 	var bytePixels []byte
 	for y := 0; y < height; y++ {
 		var row []bool
+		var byteWidth int
+		if width%8 == 0 {
+			byteWidth = width / 8
+		} else {
+			byteWidth = (width / 8) + 1
+		}
 		// all of this is double conversion and should be merged with boolSlice2byteSlice
-		for x := 0; x < ((width / 8) + ((width % 8) + 8)); x++ { // always round up to rows of 8 pixels
+		for x := 0; x < byteWidth; x++ { // always round up to rows of 8 pixels
+			fmt.Println("parsing byte: " + strconv.Itoa(x))
 			for a := 0; a < 8; a++ {
-				if x < width/8 || a <= width%8 {
+				fmt.Println("parsing pixel " + strconv.Itoa(a) + " to bit")
+				if x < width/8 {
 					row = append(row, []bool{rgbaToBW(img.At(x, y).RGBA())}...)
 				} else {
 					row = append(row, []bool{false}...)
@@ -98,9 +111,15 @@ func getPixels(img image.Image) ([]byte, error) {
 
 func boolSlice2byteSlice(s []bool) []byte {
 	var c []byte
+	fmt.Println("length of current boolSlice: " + strconv.Itoa(len(s)))
 	for y := 0; y < (len(s) / 8); y++ {
+		fmt.Println("current slice range " + strconv.Itoa(y))
 		var x, s []bool
-		if y < 7 {
+		// I'm past Ballmer's peak, so this is garbage code
+		if y == 0 {
+			x = s[0:7]
+			s = s[8:]
+		} else if y < 7 {
 			x, s = s[y:(y*8)-1], s[(y*8):]
 		} else {
 			x = s[y : (y*8)-1]
