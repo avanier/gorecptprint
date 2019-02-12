@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"log"
 	"strconv"
 
 	"github.com/boombuler/barcode/datamatrix"
@@ -92,9 +93,9 @@ func getPixels(img image.Image) ([]byte, error) {
 		for x := 0; x < byteWidth; x++ { // always round up to rows of 8 pixels
 			fmt.Println("parsing byte: " + strconv.Itoa(x))
 			for a := 0; a < 8; a++ {
-				fmt.Println("parsing pixel " + strconv.Itoa(a) + " to bit")
+				fmt.Println("parsing pixel x:"+strconv.Itoa((x*8)+a)+", y:", y, "to bit")
 				if x < width/8 {
-					row = append(row, []bool{rgbaToBW(img.At(x, y).RGBA())}...)
+					row = append(row, []bool{rgbaToBW(img.At(x+a, y).RGBA())}...)
 				} else {
 					row = append(row, []bool{false}...)
 				}
@@ -104,9 +105,7 @@ func getPixels(img image.Image) ([]byte, error) {
 		bytePixels = append(bytePixels, byteList...)
 	}
 
-	var pixelList []byte
-
-	return pixelList, nil
+	return bytePixels, nil
 }
 
 func boolSlice2byteSlice(s []bool) []byte {
@@ -122,16 +121,21 @@ func boolSlice2byteSlice(s []bool) []byte {
 		} else {
 			x = s[y : (y*8)-1]
 		}
-		var b = bitarray.NewBitArray(uint64(len(s))) // <- I'm pretty certain this is sketchy
+		// var b = bitarray.NewBitArray(uint64(len(s))) // <- I'm pretty certain this is sketchy
+		var b = bitarray.NewBitArray(1)
 		for z := 0; z < 8; z++ {
 			fmt.Println("trying bit", strconv.Itoa(z), "of", len(x)-1)
 			if x[z] == true {
 				fmt.Println("setting bit", strconv.Itoa(z), "to 1")
-				b.SetBit(uint64(z))
+				err := b.SetBit(uint64(z))
+				if err != nil {
+					log.Fatal(err)
+				}
 			} else {
 				fmt.Println("setting bit", strconv.Itoa(z), "to 0")
 			}
 		}
+		fmt.Println(b.ToNums())
 		d, _ := bitarray.Marshal(b)
 		fmt.Println("resulting byte: ", d)
 		c = append(c, d...)
@@ -140,7 +144,13 @@ func boolSlice2byteSlice(s []bool) []byte {
 }
 
 func rgbaToBW(r uint32, g uint32, b uint32, a uint32) bool {
-	return bool(r != 0) && bool(g != 0) && bool(b != 0)
+	color := bool(r != 0) || bool(g != 0) || bool(b != 0)
+	if color == true {
+		fmt.Println("pixel is black")
+	} else {
+		fmt.Println("pixel is white")
+	}
+	return color
 }
 
 // Check out https://github.com/grantae/certinfo
