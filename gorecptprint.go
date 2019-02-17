@@ -3,15 +3,13 @@ package main
 import (
 	"fmt"
 	"image"
-	"log"
 	"strconv"
 
+	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/datamatrix"
 	"github.com/jacobsa/go-serial/serial"
-	"itkettle.org/avanier/gorecptprint/lib/extras"
+	"itkettle.org/avanier/gorecptprint/lib/boolbit"
 	"itkettle.org/avanier/gorecptprint/lib/tf6"
-
-	"github.com/Workiva/go-datastructures/bitarray"
 )
 
 var cmdCut = []byte{0x0c}
@@ -27,32 +25,25 @@ var options = serial.OpenOptions{
 }
 
 func main() {
-	// initialize()
+	initialize()
 	// extras.PrintDummyGraphic(options)
 	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
-	// tf6.PrintString("Hello World", options)
+	tf6.PrintString("Hello World", options)
 	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
 
 	dmtxCode, _ := datamatrix.Encode("Hello World")
-	// dmtxCode, _ = barcode.Scale(dmtxCode, 432, 432) // 432 is 3 times 144
+	dmtxCode, _ = barcode.Scale(dmtxCode, dmtxCode.Bounds().Max.X*4, dmtxCode.Bounds().Max.Y*4)
 
-	// bounds := dmtxCode.Bounds()
-
-	// dmtxProps := tf6.GraphicProps{
-	// 	D: 2,
-	// 	W: int16(bounds.Max.X),
-	// 	H: int16(bounds.Max.Y),
-	// }
-
-	pixels, _ := getPixels(dmtxCode)
+	pixels, byteWidth, height := getPixels(dmtxCode)
 
 	fmt.Println(pixels)
+	fmt.Printf("%2x\n", pixels)
+	fmt.Println(byteWidth, height)
 
-	// var dmtxData []byte
+	dmtxProps := tf6.GraphicProps{D: 2, W: int16(byteWidth), H: int16(height)}
+	tf6.PrintGraphic(dmtxProps, pixels, options)
 
-	// tf6.PrintGraphic(dmtxProps, dmtxData)
-
-	// tf6.ExecuteHex(cmdCut, options)
+	tf6.ExecuteHex(cmdCut, options)
 	// extras.ByeTune(options)
 }
 
@@ -65,25 +56,21 @@ func initialize() {
 		0x1B, 0x43, 0xFF, // Set the number of feed lines before cut to 255 (FF) steps, default 160 (A0) <p.138>
 	}
 	tf6.ExecuteHex(initCmds, options)
-	extras.ReadyTune(options)
+	// extras.ReadyTune(options)
 }
 
-// NOTE TO SELF
-// Implement bwImage with dimensions automatically conformed to nearest 8 pixels
-// Allow it to take an Image type for conversion
-// Make it have dimensions properties and a hexdump instance method
-
 // Converts an Image to a list of black and white pixels
-func getPixels(img image.Image) ([]byte, error) {
+func getPixels(img image.Image) ([]byte, int, int) {
 	bounds := img.Bounds()
 	width, height := bounds.Max.X, bounds.Max.Y
 
 	fmt.Println("width: " + strconv.Itoa(width) + " pixels")
 
+	var byteWidth int
 	var bytePixels []byte
 	for y := 0; y < height; y++ {
 		var row []bool
-		var byteWidth int
+		var stringRow string
 		if width%8 == 0 {
 			byteWidth = width / 8
 		} else {
@@ -91,9 +78,9 @@ func getPixels(img image.Image) ([]byte, error) {
 		}
 		// all of this is double conversion and should be merged with boolSlice2byteSlice
 		for x := 0; x < byteWidth; x++ { // always round up to rows of 8 pixels
-			fmt.Println("parsing byte: " + strconv.Itoa(x))
+			// fmt.Println("parsing byte: " + strconv.Itoa(x))
 			for a := 0; a < 8; a++ {
-				fmt.Println("parsing pixel x:"+strconv.Itoa((x*8)+a)+", y:", y, "to bit")
+				// fmt.Println("parsing pixel x:"+strconv.Itoa((x*8)+a)+", y:", y, "to bit")
 				if x < width/8 {
 					row = append(row, []bool{rgbaToBW(img.At(x+a, y).RGBA())}...)
 				} else {
@@ -101,56 +88,28 @@ func getPixels(img image.Image) ([]byte, error) {
 				}
 			}
 		}
-		byteList := boolSlice2byteSlice(row)
-		bytePixels = append(bytePixels, byteList...)
+		for i := 0; i < byteWidth; i++ {
+			var x [8]bool
+			copy(x[:], row[:8])
+			row = row[8:]
+			b := boolbit.BoolBit{Raw: x}
+			stringRow += b.ToBin()
+			bytePixels = append(bytePixels, []byte{b.ToHex()}...)
+		}
+		fmt.Println(stringRow)
 	}
 
-	return bytePixels, nil
-}
-
-func boolSlice2byteSlice(s []bool) []byte {
-	var c []byte
-	fmt.Println("length of current boolSlice:", strconv.Itoa(len(s)), "bits")
-	for y := 0; y < (len(s) / 8); y++ {
-		fmt.Println("current slice range " + strconv.Itoa(y))
-		var x []bool
-		if y == 0 {
-			x, s = s[0:8], s[8:]
-		} else if y < 7 {
-			x, s = s[y:(y*8)], s[(y*8):]
-		} else {
-			x = s[y : (y*8)-1]
-		}
-		// var b = bitarray.NewBitArray(uint64(len(s))) // <- I'm pretty certain this is sketchy
-		var b = bitarray.NewBitArray(1)
-		for z := 0; z < 8; z++ {
-			fmt.Println("trying bit", strconv.Itoa(z), "of", len(x)-1)
-			if x[z] == true {
-				fmt.Println("setting bit", strconv.Itoa(z), "to 1")
-				err := b.SetBit(uint64(z))
-				if err != nil {
-					log.Fatal(err)
-				}
-			} else {
-				fmt.Println("setting bit", strconv.Itoa(z), "to 0")
-			}
-		}
-		fmt.Println(b.ToNums())
-		d, _ := bitarray.Marshal(b)
-		fmt.Println("resulting byte: ", d)
-		c = append(c, d...)
-	}
-	return c
+	return bytePixels, byteWidth, height
 }
 
 func rgbaToBW(r uint32, g uint32, b uint32, a uint32) bool {
-	color := bool(r != 0) || bool(g != 0) || bool(b != 0)
-	if color == true {
-		fmt.Println("pixel is black")
+	black := bool(r == uint32(0))
+	if black == true {
+		// fmt.Println("pixel is black")
 	} else {
-		fmt.Println("pixel is white")
+		// fmt.Println("pixel is white")
 	}
-	return color
+	return black
 }
 
 // Check out https://github.com/grantae/certinfo

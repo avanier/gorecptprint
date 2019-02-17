@@ -4,24 +4,20 @@ type BoolBit struct {
 	Raw [8]bool
 }
 
-func New(boolSlice [8]bool) *BoolBit {
-	return &BoolBit{Raw: boolSlice}
-}
-
-func ToByte(bb *BoolBit) byte {
-	var oneByte byte
+func (bb *BoolBit) ToHex() byte {
+	var doubleByte byte
 
 	for i := 0; i < 8; i++ {
 		if i == 0 && bb.Raw[7-i] == true {
-			oneByte = 0x01
+			doubleByte = 0x01
 		} else {
 			if bb.Raw[7-i] == true {
-				oneByte += byte(2 * i)
+				doubleByte += byte(2 * i)
 			}
 		}
 	}
 
-	return oneByte
+	return doubleByte
 }
 
 func (bb *BoolBit) ToBin() string {
