@@ -41,10 +41,10 @@ func PrintString(inputString string, options serial.OpenOptions) {
 
 func PrintGraphic(props GraphicProps, data []byte, options serial.OpenOptions) {
 	commandPrefix := []byte{0x1b, 0x2a}
-	wholeCommand := append(commandPrefix, []byte{byte(props.D)}...)   // add doubleprint
-	wholeCommand = append(wholeCommand, []byte{byte(props.W)}...)     // add width
-	wholeCommand = append(wholeCommand, []byte{byte(props.H / 8)}...) // add height
-	wholeCommand = append(wholeCommand, data...)                      // and the data
+	wholeCommand := append(commandPrefix, []byte{byte(props.D)}...) // add doubleprint
+	wholeCommand = append(wholeCommand, []byte{byte(props.W)}...)   // add width
+	wholeCommand = append(wholeCommand, []byte{byte(props.H)}...)   // add height
+	wholeCommand = append(wholeCommand, data...)                    // and the data
 	fmt.Printf("%2x\n", wholeCommand)
 	ExecuteHex(wholeCommand, options)
 }

@@ -26,21 +26,24 @@ var options = serial.OpenOptions{
 
 func main() {
 	initialize()
+	daString := "While insomnia is quite unpleasant, it is sometimes useful. Now, is this going to work with unreasonably long data. Lorem ipsum dolor sit amet, consectetur adipiscing elit."
 	// extras.PrintDummyGraphic(options)
 	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
-	tf6.PrintString("Hello World", options)
+	tf6.PrintString(daString, options)
 	// tf6.ExecuteHex([]byte{0x1b, 0x64, 0x02}, options) // Feed N lines
 
-	dmtxCode, _ := datamatrix.Encode("Hello World")
-	dmtxCode, _ = barcode.Scale(dmtxCode, dmtxCode.Bounds().Max.X*4, dmtxCode.Bounds().Max.Y*4)
+	scaleFactor := 3
 
-	pixels, byteWidth, height := getPixels(dmtxCode)
+	dmtxCode, _ := datamatrix.Encode(daString)
+	dmtxCode, _ = barcode.Scale(dmtxCode, dmtxCode.Bounds().Max.X*scaleFactor, dmtxCode.Bounds().Max.Y*scaleFactor)
+
+	pixels, width, height := getPixels(dmtxCode)
 
 	fmt.Println(pixels)
 	fmt.Printf("%2x\n", pixels)
-	fmt.Println(byteWidth, height)
+	fmt.Println(width, height)
 
-	dmtxProps := tf6.GraphicProps{D: 2, W: int16(byteWidth), H: int16(height)}
+	dmtxProps := tf6.GraphicProps{D: 2, W: int16(width / 8), H: int16(height / 8)}
 	tf6.PrintGraphic(dmtxProps, pixels, options)
 
 	tf6.ExecuteHex(cmdCut, options)
@@ -66,29 +69,20 @@ func getPixels(img image.Image) ([]byte, int, int) {
 
 	fmt.Println("width: " + strconv.Itoa(width) + " pixels")
 
-	var byteWidth int
+	roundedWidth := width + (8 - width%8) // always round up to multiples of 8 pixels
+
 	var bytePixels []byte
 	for y := 0; y < height; y++ {
 		var row []bool
 		var stringRow string
-		if width%8 == 0 {
-			byteWidth = width / 8
-		} else {
-			byteWidth = (width / 8) + 1
-		}
-		// all of this is double conversion and should be merged with boolSlice2byteSlice
-		for x := 0; x < byteWidth; x++ { // always round up to rows of 8 pixels
-			// fmt.Println("parsing byte: " + strconv.Itoa(x))
-			for a := 0; a < 8; a++ {
-				// fmt.Println("parsing pixel x:"+strconv.Itoa((x*8)+a)+", y:", y, "to bit")
-				if x < width/8 {
-					row = append(row, []bool{rgbaToBW(img.At(x+a, y).RGBA())}...)
-				} else {
-					row = append(row, []bool{false}...)
-				}
+		for x := 0; x < roundedWidth; x++ {
+			if x < width {
+				row = append(row, []bool{rgbaToBW(img.At(x, y).RGBA())}...)
+			} else {
+				row = append(row, []bool{false}...)
 			}
 		}
-		for i := 0; i < byteWidth; i++ {
+		for i := 0; i < roundedWidth/8; i++ {
 			var x [8]bool
 			copy(x[:], row[:8])
 			row = row[8:]
@@ -99,7 +93,7 @@ func getPixels(img image.Image) ([]byte, int, int) {
 		fmt.Println(stringRow)
 	}
 
-	return bytePixels, byteWidth, height
+	return bytePixels, roundedWidth, height
 }
 
 func rgbaToBW(r uint32, g uint32, b uint32, a uint32) bool {

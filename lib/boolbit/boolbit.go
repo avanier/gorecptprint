@@ -1,5 +1,7 @@
 package boolbit
 
+import "math"
+
 type BoolBit struct {
 	Raw [8]bool
 }
@@ -12,7 +14,7 @@ func (bb *BoolBit) ToHex() byte {
 			doubleByte = 0x01
 		} else {
 			if bb.Raw[7-i] == true {
-				doubleByte += byte(2 * i)
+				doubleByte += byte(math.Pow(2, float64(i)))
 			}
 		}
 	}
