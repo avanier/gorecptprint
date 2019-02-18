@@ -1,6 +1,8 @@
 package extras
 
 import (
+	"unicode/utf8"
+
 	"github.com/jacobsa/go-serial/serial"
 	"itkettle.org/avanier/gorecptprint/lib/tf6"
 )
@@ -65,4 +67,18 @@ func ReadyTune(options serial.OpenOptions) {
 		0x99,
 	}
 	tf6.ExecuteHex(readyTune, options)
+}
+
+func SplitString(longString string, maxLen int) []string {
+	splits := []string{}
+
+	var l, r int
+	for l, r = 0, maxLen; r < len(longString); l, r = r, r+maxLen {
+		for !utf8.RuneStart(longString[r]) {
+			r--
+		}
+		splits = append(splits, longString[l:r])
+	}
+	splits = append(splits, longString[l:])
+	return splits
 }
