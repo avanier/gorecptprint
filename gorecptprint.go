@@ -1,12 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"io/ioutil"
+	"log"
+	"os"
 	"strconv"
-	"strings"
 
 	"itkettle.org/avanier/gorecptprint/lib/extras"
 
@@ -18,7 +21,7 @@ import (
 )
 
 var cmdCut = []byte{0x0c}
-var cmdFeed = []byte{0x1b, 0x4a, 0x10} // Print and feed paper using minimum units, 2mm in this case <p.156>
+var cmdFeed = []byte{0x1b, 0x4a, 0x20} // Print and feed paper using minimum units, 2mm in this case <p.156>
 var cmdSize0 = []byte{0x1d, 0x21, 0x00}
 var cmdSize1 = []byte{0x1d, 0x21, 0x01}
 
@@ -30,17 +33,25 @@ var options = serial.OpenOptions{
 	MinimumReadSize: 4,
 }
 
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s [inputfile]\n", os.Args[0])
+	flag.PrintDefaults()
+	os.Exit(2)
+}
+
 func main() {
 	initialize()
-	daString := `
-	Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Eu volutpat odio facilisis mauris sit amet massa vitae. Pellentesque habitant morbi tristique senectus et netus. Sed lectus vestibulum mattis ullamcorper velit. Vitae sapien pellentesque habitant morbi tristique senectus et. Ac turpis egestas integer eget aliquet nibh praesent tristique. Aliquet eget sit amet tellus cras adipiscing enim. Netus et malesuada fames ac. Eget sit amet tellus cras adipiscing enim. Elit eget gravida cum sociis natoque penatibus et magnis. Diam volutpat commodo sed egestas egestas. Diam quam nulla porttitor massa. Condimentum lacinia quis vel eros donec ac odio. Eget duis at tellus at urna condimentum. Pharetra massa massa ultricies mi quis hendrerit dolor magna. Lectus proin nibh nisl condimentum id venenatis a condimentum vitae. Fames ac turpis egestas integer eget aliquet nibh. Faucibus pulvinar elementum integer enim neque.
+	if os.Args[0] == "" {
+		usage()
+	}
 
-	Nec sagittis aliquam malesuada bibendum arcu vitae. Ipsum nunc aliquet bibendum enim facilisis gravida neque. Egestas diam in arcu cursus euismod. Metus aliquam eleifend mi in nulla posuere sollicitudin aliquam ultrices. Mattis ullamcorper velit sed ullamcorper morbi tincidunt ornare. Duis ultricies lacus sed turpis tincidunt. Eget felis eget nunc lobortis mattis aliquam faucibus purus in. Proin fermentum leo vel orci porta. Eget dolor morbi non arcu risus quis varius quam quisque. Rhoncus aenean vel elit scelerisque mauris. Imperdiet massa tincidunt nunc pulvinar sapien et ligula. Tellus integer feugiat scelerisque varius morbi enim. Sem et tortor consequat id porta nibh venenatis cras. Aliquam sem fringilla ut morbi. Tellus orci ac auctor augue mauris. Lectus mauris ultrices eros in cursus turpis massa tincidunt. Senectus et netus et malesuada. Proin nibh nisl condimentum id venenatis a.
+	certPath := os.Args[1]
+	certData, err := ioutil.ReadFile(certPath)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	Aliquam purus sit amet luctus venenatis lectus magna fringilla urna. Volutpat lacus laoreet non curabitur gravida. Nulla pellentesque dignissim enim sit amet venenatis urna cursus eget. At in tellus integer feugiat scelerisque varius morbi enim nunc. A scelerisque purus semper eget duis at. Sed lectus vestibulum mattis ullamcorper. Scelerisque purus semper eget duis at. Ut porttitor leo a diam sollicitudin. Sit amet aliquam id diam maecenas ultricies. Scelerisque mauris pellentesque pulvinar pellentesque habitant morbi tristique. Posuere lorem ipsum dolor sit amet. Arcu vitae elementum curabitur vitae nunc sed velit dignissim. In est ante in nibh mauris cursus mattis molestie. In ante metus dictum at tempor commodo. Eu augue ut lectus arcu bibendum at varius vel. Eu scelerisque felis imperdiet proin fermentum leo vel. Sagittis nisl rhoncus mattis rhoncus urna. Dui faucibus in ornare quam viverra orci sagittis eu volutpat. Elit duis tristique sollicitudin nibh sit amet commodo nulla.
-	`
-	// daString := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Eu volutpat odio facilisis mauris sit amet massa vitae. Pellentesque habitant morbi tristique senectus et netus. Sed lectus vestibulum mattis ullamcorper velit. Vitae sapien pellentesque habitant morbi tristique senectus et. Ac turpis egestas integer eget aliquet nibh praesent tristique. Aliquet eget sit amet tellus cras adipiscing enim. Netus et malesuada fames ac. Eget sit amet tellus cras adipiscing enim. Elit eget gravida cum sociis natoque penatibus et magnis. Diam volutpat commodo sed egestas egestas. Diam quam nulla porttitor massa. Condimentum lacinia quis vel eros donec ac odio. Eget duis at tellus at urna condimentum. Pharetra massa massa ultricies mi quis hendrerit dolor magna. Lectus proin nibh nisl condimentum id venenatis a condimentum vitae. Fames ac turpis egestas integer eget aliquet nibh. Faucibus pulvinar elementum integer enim neque."
-	stringArray := extras.SplitString(daString, 174)
+	stringArray := extras.SplitString(string(certData), 174)
 
 	scaleFactor := 2
 	symbPerLine := 2
@@ -72,7 +83,7 @@ func main() {
 			dr := image.Rectangle{sp, sp.Add(oneBarcode.Bounds().Size())} // make a drawing rectangle for holding them pixels
 			if sInd == 0 {
 				fullWidth := (oneBarcode.Bounds().Dx() * symbPerLine) + (offset * symbPerLine)
-				masterRectangle = image.Rectangle{image.ZP, image.Point{fullWidth, oneBarcode.Bounds().Dy()}}
+				masterRectangle = image.Rectangle{image.ZP, image.Point{fullWidth + (2 * scaleFactor), oneBarcode.Bounds().Dy() + (2 * scaleFactor)}}
 				masterImage = image.NewRGBA(masterRectangle)
 				white := color.RGBA{255, 255, 255, 255}
 				draw.Draw(masterImage, masterImage.Bounds(), &image.Uniform{white}, image.ZP, draw.Src) // apply primer on the whole rectangle
@@ -80,7 +91,7 @@ func main() {
 			draw.Draw(masterImage, dr, oneBarcode, image.ZP, draw.Src)
 		}
 
-		tf6.PrintString(strings.Join(stringBatch, ""), options)
+		// tf6.PrintString(strings.Join(stringBatch, ""), options)
 		pixels, width, height := getPixels(masterImage)
 
 		dmtxProps := tf6.GraphicProps{D: 2, W: int16(width / 8), H: int16(height / 8)}
@@ -88,26 +99,9 @@ func main() {
 		tf6.ExecuteHex(cmdFeed, options)
 	}
 
-	// for i := 0; i < len(stringArray); i++ {
-	// 	oneCode := stringArray[i]
-
-	// 	tf6.PrintString(oneCode, options)
-	// 	dmtxCode, _ := datamatrix.Encode(oneCode)
-	// 	dmtxCode, _ = barcode.Scale(dmtxCode, dmtxCode.Bounds().Max.X*scaleFactor, dmtxCode.Bounds().Max.Y*scaleFactor)
-
-	// 	pixels, width, height := getPixels(dmtxCode)
-
-	// 	dmtxProps := tf6.GraphicProps{D: 2, W: int16(width / 8), H: int16(height / 8)}
-	// 	tf6.PrintGraphic(dmtxProps, pixels, options)
-	// 	tf6.ExecuteHex(cmdFeed, options)
-	// }
-
 	tf6.ExecuteHex(cmdCut, options)
-	// extras.ByeTune(options)
+	extras.ByeTune(options)
 }
-
-// Data buffer on the printer is 16KB
-// Check out pages 115 and 157 for uploading and printing pixels
 
 func initialize() {
 	var initCmds = []byte{
@@ -115,7 +109,7 @@ func initialize() {
 		0x1B, 0x43, 0xFF, // Set the number of feed lines before cut to 255 (FF) steps, default 160 (A0) <p.138>
 	}
 	tf6.ExecuteHex(initCmds, options)
-	// extras.ReadyTune(options)
+	extras.ReadyTune(options)
 }
 
 // Converts an Image to a list of black and white pixels
@@ -154,13 +148,10 @@ func getPixels(img image.Image) ([]byte, int, int) {
 
 func rgbaToBW(r uint32, g uint32, b uint32, a uint32) bool {
 	black := bool(r == uint32(0))
-	if black == true {
-		// fmt.Println("pixel is black")
-	} else {
-		// fmt.Println("pixel is white")
-	}
 	return black
 }
 
 // Check out https://github.com/grantae/certinfo
 // openssl x509 -in "$2" -text -noout -certopt no_pubkey,no_sigdump
+// https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art030
+// openssl asn1parse
