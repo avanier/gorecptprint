@@ -40,7 +40,6 @@ func usage() {
 }
 
 func main() {
-	initialize()
 	if os.Args[0] == "" {
 		usage()
 	}
@@ -66,6 +65,7 @@ func main() {
 		numGroups = (len(stringArray) / symbPerLine)
 	}
 
+	initialize()
 	for grInd := 0; grInd < numGroups; grInd++ {
 		stringBatch := make([]string, symbPerLine)
 		var masterRectangle image.Rectangle
