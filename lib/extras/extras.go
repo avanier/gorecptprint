@@ -141,14 +141,14 @@ func CertToKVPairs(certData []byte) ([]KeyValuePair, error) {
 		output = append(output, KeyValuePair{"MaxPathLen", fmt.Sprintf("%X", cert.MaxPathLen)})
 	}
 	if len(cert.DNSNames) > 0 {
-		output = append(output, KeyValuePair{"DNS SANs: ", strings.Join(cert.DNSNames, "\n")})
+		output = append(output, KeyValuePair{"DNS SANs", strings.Join(cert.DNSNames, "\n")})
 	}
 	if len(cert.IPAddresses) > 0 {
 		var ipAddresses []string
 		for i := 0; i < len(cert.IPAddresses); i++ {
 			ipAddresses = append(ipAddresses, []string{cert.IPAddresses[i].String()}...)
 		}
-		output = append(output, KeyValuePair{"IP SANs: ", strings.Join(ipAddresses, "\n")})
+		output = append(output, KeyValuePair{"IP SANs", strings.Join(ipAddresses, "\n")})
 	}
 
 	return output, err

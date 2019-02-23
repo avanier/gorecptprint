@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"itkettle.org/avanier/gorecptprint/lib/extras"
@@ -56,12 +57,21 @@ func main() {
 	for i := 0; i < len(pairs); i++ {
 		tf6.PrintTitleValues(pairs[i].Key, pairs[i].Value+"\n", options)
 	}
+	time.Sleep(1 * time.Second)
 
 	tf6.ExecuteHex(cmdFeed, options)
 	tf6.ExecuteHex(cmdFeed, options)
 	tf6.ExecuteHex(cmdFeed, options)
 
 	stringArray := extras.SplitString(string(certData), 174)
+
+	// zero-pad to maximum byte length for the last symbol
+
+	if len(stringArray[len(stringArray)-1]) < 174 {
+		shortString := stringArray[len(stringArray)-1]
+		paddedString := shortString + "\n" + strings.Repeat("0", (173-len(shortString)))
+		stringArray[len(stringArray)-1] = paddedString
+	}
 
 	scaleFactor := 2
 	symbPerLine := 2
@@ -109,7 +119,7 @@ func main() {
 		// To prevent the buffer from exploding, we do this ugly thing which is simpler than
 		// implementing flow control...
 		// at 15 lps * 20 px == 300 px high per second is printed
-		time.Sleep(time.Duration((height/300)+1) * time.Second) // add 1 second for wiggle room
+		time.Sleep(time.Duration((height/300)+2) * time.Second) // add 1 second for wiggle room
 	}
 
 	tf6.ExecuteHex(cmdCut, options)
