@@ -76,7 +76,7 @@ func main() {
 
 	if len(stringArray[len(stringArray)-1]) < 174 {
 		shortString := stringArray[len(stringArray)-1]
-		paddedString := shortString + "\n" + strings.Repeat("0", (173-len(shortString)))
+		paddedString := shortString + "\n" + strings.Repeat(string("\x00"), (173-len(shortString)))
 		stringArray[len(stringArray)-1] = paddedString
 	}
 
