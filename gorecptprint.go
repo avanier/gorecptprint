@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"itkettle.org/avanier/gorecptprint/lib/extras"
 
@@ -44,11 +45,21 @@ func main() {
 		usage()
 	}
 
-	certPath := os.Args[1]
-	certData, err := ioutil.ReadFile(certPath)
+	certData, err := ioutil.ReadFile(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	pairs, err := extras.CertToKVPairs(certData)
+
+	initialize()
+	for i := 0; i < len(pairs); i++ {
+		tf6.PrintTitleValues(pairs[i].Key, pairs[i].Value+"\n", options)
+	}
+
+	tf6.ExecuteHex(cmdFeed, options)
+	tf6.ExecuteHex(cmdFeed, options)
+	tf6.ExecuteHex(cmdFeed, options)
 
 	stringArray := extras.SplitString(string(certData), 174)
 
@@ -65,7 +76,6 @@ func main() {
 		numGroups = (len(stringArray) / symbPerLine)
 	}
 
-	initialize()
 	for grInd := 0; grInd < numGroups; grInd++ {
 		stringBatch := make([]string, symbPerLine)
 		var masterRectangle image.Rectangle
@@ -83,7 +93,7 @@ func main() {
 			dr := image.Rectangle{sp, sp.Add(oneBarcode.Bounds().Size())} // make a drawing rectangle for holding them pixels
 			if sInd == 0 {
 				fullWidth := (oneBarcode.Bounds().Dx() * symbPerLine) + (offset * symbPerLine)
-				masterRectangle = image.Rectangle{image.ZP, image.Point{fullWidth + (2 * scaleFactor), oneBarcode.Bounds().Dy() + (2 * scaleFactor)}}
+				masterRectangle = image.Rectangle{image.ZP, image.Point{fullWidth + (1 * scaleFactor), oneBarcode.Bounds().Dy() + (1 * scaleFactor)}}
 				masterImage = image.NewRGBA(masterRectangle)
 				white := color.RGBA{255, 255, 255, 255}
 				draw.Draw(masterImage, masterImage.Bounds(), &image.Uniform{white}, image.ZP, draw.Src) // apply primer on the whole rectangle
@@ -91,12 +101,15 @@ func main() {
 			draw.Draw(masterImage, dr, oneBarcode, image.ZP, draw.Src)
 		}
 
-		// tf6.PrintString(strings.Join(stringBatch, ""), options)
 		pixels, width, height := getPixels(masterImage)
 
 		dmtxProps := tf6.GraphicProps{D: 2, W: int16(width / 8), H: int16(height / 8)}
 		tf6.PrintGraphic(dmtxProps, pixels, options)
 		tf6.ExecuteHex(cmdFeed, options)
+		// To prevent the buffer from exploding, we do this ugly thing which is simpler than
+		// implementing flow control...
+		// at 15 lps * 20 px == 300 px high per second is printed
+		time.Sleep(time.Duration((height/300)+1) * time.Second) // add 1 second for wiggle room
 	}
 
 	tf6.ExecuteHex(cmdCut, options)

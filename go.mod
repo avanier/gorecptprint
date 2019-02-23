@@ -1,8 +1,10 @@
 module itkettle.org/avanier/gorecptprint
 
 require (
+	github.com/Showmax/go-fqdn v0.0.0-20180501083314-6f60894d629f
 	github.com/Workiva/go-datastructures v1.0.50 // indirect
 	github.com/boombuler/barcode v1.0.0
+	github.com/denisbrodbeck/machineid v1.0.0
 	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
 	github.com/mkideal/pkg v0.0.0-20170503154153-3e188c9e7ecc // indirect
 	golang.org/x/image v0.0.0-20190118043309-183bebdce1b2 // indirect
