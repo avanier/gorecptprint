@@ -22,6 +22,7 @@ import (
 	"itkettle.org/avanier/gorecptprint/lib/tf6"
 )
 
+var playSong bool
 var cmdCut = []byte{0x0c}
 var cmdFeed = []byte{0x1b, 0x4a, 0x20} // Print and feed paper using minimum units, 2mm in this case <p.156>
 var cmdSize0 = []byte{0x1d, 0x21, 0x00}
@@ -44,6 +45,12 @@ func usage() {
 func main() {
 	if os.Args[0] == "" {
 		usage()
+	}
+
+	if os.Getenv("PLAY_TUNE") == "false" {
+		playSong = false
+	} else {
+		playSong = true
 	}
 
 	certData, err := ioutil.ReadFile(os.Args[1])
@@ -123,7 +130,9 @@ func main() {
 	}
 
 	tf6.ExecuteHex(cmdCut, options)
-	extras.ByeTune(options)
+	if playSong {
+		extras.ByeTune(options)
+	}
 }
 
 func initialize() {
@@ -132,7 +141,9 @@ func initialize() {
 		0x1B, 0x43, 0xFF, // Set the number of feed lines before cut to 255 (FF) steps, default 160 (A0) <p.138>
 	}
 	tf6.ExecuteHex(initCmds, options)
-	extras.ReadyTune(options)
+	if playSong {
+		extras.ReadyTune(options)
+	}
 }
 
 // Converts an Image to a list of black and white pixels
