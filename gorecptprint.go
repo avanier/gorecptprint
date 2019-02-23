@@ -37,13 +37,13 @@ var options = serial.OpenOptions{
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [inputfile]\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s pemEncodedCertFile\n", os.Args[0])
 	flag.PrintDefaults()
 	os.Exit(2)
 }
 
 func main() {
-	if os.Args[0] == "" {
+	if len(os.Args) <= 1 {
 		usage()
 	}
 
