@@ -3,6 +3,7 @@ package comm
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/avanier/gorecptprint/lib/util"
 	"github.com/spf13/viper"
@@ -57,18 +58,8 @@ func Init() {
 		log.Fatal(err)
 	}
 
-	// ports, err := serial.GetPortsList()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// fmt.Println(ports)
-
-	// fmt.Println(port.GetModemStatusBits())
-
 	startFlowReader()
 	resetPrinter()
-	verifyPreviousCommand()
 	disableTransparentXONXOFF()
 }
 
@@ -93,6 +84,14 @@ func ExecuteCommand(cmd []byte) {
 	writeToPort(cmd)
 }
 
+// UnsafeExecuteCommand sends a command directly to the printer without checking
+// the buffer status. This is useful for executing async commands (see p. xxx) or
+// for configuring the printer before the flow control system is enabled.
+func UnsafeExecuteCommand(cmd []byte) {
+	fmt.Printf("unsafely executing:\t 0x%X\n", cmd)
+	Port.Write(cmd)
+}
+
 // chunkData chunks data in groups sized by `writeChunkSize`.
 // Shamelessly lifted from SliceTricks.
 // https://github.com/golang/go/wiki/SliceTricks
@@ -113,7 +112,7 @@ func writeToPort(cmd []byte) {
 
 	dataChunks := chunkData(cmd)
 
-	for i := 0; i <= len(dataChunks); i++ {
+	for i := 0; i <= len(dataChunks)-1; i++ {
 		if !recipientReady {
 			_ = <-readyToWrite
 		}
@@ -124,13 +123,14 @@ func writeToPort(cmd []byte) {
 // disableTransparentXONXOFF disables transparent flow control with an unsafe
 // write.
 func disableTransparentXONXOFF() {
-	Port.Write([]byte{0x10, 0x05, 0x43})
+	UnsafeExecuteCommand([]byte{0x10, 0x05, 0x43})
 }
 
 // resetPrinter performs a soft power-cycle of the printer and returns its to the
 // default parameters. This is an async command and is done with an unsafe write.
 func resetPrinter() {
-	Port.Write([]byte{0x10, 0x05, 0x40})
+	UnsafeExecuteCommand([]byte{0x10, 0x05, 0x40})
+	time.Sleep(time.Second * 3)
 }
 
 // WatchPrinterOutput is a debug convenience function that read the data sent from
@@ -175,7 +175,7 @@ func requestPrinterID() {
 // verifyPreviousCommand unsafely sends a status query.
 func verifyPreviousCommand() {
 	var buf = make([]byte, 8)
-	Port.Write([]byte{0x1b, 0x00, 0x80, 0x00}) // Verify previous command completed
+	UnsafeExecuteCommand([]byte{0x1b, 0x00, 0x80, 0x00}) // Verify previous command completed
 	displayResponse(buf)
 }
 
@@ -205,7 +205,7 @@ func emitReadyToWrite() {
 
 func initReaderLoop() {
 	var err error
-	var buf = make([]byte, 8)
+	var buf = make([]byte, 1)
 	recipientReady = false
 
 	for {
