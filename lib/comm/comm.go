@@ -32,10 +32,15 @@ const XOFF = 0x13
 // Exposed the global instance of the serial port.
 var Port serial.Port
 
+// writeChunkSize is a tunable that allows to change the size of every write
+// loop
+var writeChunkSize uint
+
 // Init prepares the com port for communication with the printer
 func Init() {
 	var err error
 	var serial_port string
+	writeChunkSize = viper.GetUint("write-chunk-size")
 
 	mode := &serial.Mode{
 		BaudRate: 19200,
@@ -61,10 +66,10 @@ func Init() {
 
 	// fmt.Println(port.GetModemStatusBits())
 
+	startFlowReader()
 	resetPrinter()
 	verifyPreviousCommand()
 	disableTransparentXONXOFF()
-	startFlowReader()
 }
 
 func displayResponse(resp []byte) {
@@ -85,17 +90,47 @@ func displayResponse(resp []byte) {
 // ExecuteCommand executes a command with an arbitrary byte payload.
 func ExecuteCommand(cmd []byte) {
 	fmt.Printf("executing:\t 0x%X\n", cmd)
-	Port.Write(cmd)
+	writeToPort(cmd)
 }
 
+// chunkData chunks data in groups sized by `writeChunkSize`.
+// Shamelessly lifted from SliceTricks.
+// https://github.com/golang/go/wiki/SliceTricks
+func chunkData(unchunked []byte) [][]byte {
+	dataChunks := make([][]byte, 0, (len(unchunked)+int(writeChunkSize)-1)/int(writeChunkSize))
+
+	for int(writeChunkSize) < len(unchunked) {
+		unchunked, dataChunks = unchunked[writeChunkSize:], append(dataChunks, unchunked[0:writeChunkSize:writeChunkSize])
+	}
+	dataChunks = append(dataChunks, unchunked)
+	return dataChunks
+}
+
+func writeToPort(cmd []byte) {
+	// take the payload, split it in chunks of writeChunkSize
+	// for every chunk check if we can currently write, if the buffer is full wait
+	// for the channel to continue
+
+	dataChunks := chunkData(cmd)
+
+	for i := 0; i <= len(dataChunks); i++ {
+		if !recipientReady {
+			_ = <-readyToWrite
+		}
+		Port.Write(dataChunks[i])
+	}
+}
+
+// disableTransparentXONXOFF disables transparent flow control with an unsafe
+// write.
 func disableTransparentXONXOFF() {
-	ExecuteCommand([]byte{0x10, 0x05, 0x43})
+	Port.Write([]byte{0x10, 0x05, 0x43})
 }
 
 // resetPrinter performs a soft power-cycle of the printer and returns its to the
-// default parameters.
+// default parameters. This is an async command and is done with an unsafe write.
 func resetPrinter() {
-	ExecuteCommand([]byte{0x10, 0x05, 0x40})
+	Port.Write([]byte{0x10, 0x05, 0x40})
 }
 
 // WatchPrinterOutput is a debug convenience function that read the data sent from
@@ -137,14 +172,15 @@ func requestPrinterID() {
 	displayResponse(buf)
 }
 
+// verifyPreviousCommand unsafely sends a status query.
 func verifyPreviousCommand() {
 	var buf = make([]byte, 8)
-	ExecuteCommand([]byte{0x1b, 0x00, 0x80, 0x00}) // Verify previous command completed
+	Port.Write([]byte{0x1b, 0x00, 0x80, 0x00}) // Verify previous command completed
 	displayResponse(buf)
 }
 
-// readyToWrite exposes a channel signalling that the printer has signalled its
-// buffer is ready to accept data again after being declared full.
+// readyToWrite exposes a channel signalling that the printer's buffer is ready
+// to accept data again after being declared full.
 var readyToWrite chan bool
 
 // recipientReady tracks whether the printer's buffer is ready for data or not.
@@ -157,17 +193,20 @@ func startFlowReader() {
 }
 
 func emitReadyToWrite() {
+	// Here we do a non-blocking unbuffered channel write to announce we are ready
+	// to work again.
 	select {
 	case readyToWrite <- true:
-		// there is a receiver available for that message
+		// If there is a receiver available for that message, yay.
 	default:
-		// otherwise carry on
+		// Otherwise carry on.
 	}
 }
 
 func initReaderLoop() {
 	var err error
 	var buf = make([]byte, 8)
+	recipientReady = false
 
 	for {
 		_, err = Port.Read(buf)
@@ -180,7 +219,7 @@ func initReaderLoop() {
 			case XON:
 				if !recipientReady {
 					recipientReady = true
-					// go emitReadyToWrite()
+					go emitReadyToWrite()
 				}
 			case XOFF:
 				recipientReady = false

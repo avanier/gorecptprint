@@ -19,8 +19,10 @@ var printCmd = &cobra.Command{
 
 func init() {
 	var defaultSerialPort = "/dev/ttyS0"
+	var defaultWriteChunkSize = uint(192)
 
 	printCmd.PersistentFlags().String("port", defaultSerialPort, "serial port to use for communication")
+	printCmd.PersistentFlags().Uint("write-chunk-size", defaultWriteChunkSize, "the size in bytes of every chunk of data sent to the printer")
 
 	viper.BindPFlags(printCmd.PersistentFlags())
 	viper.BindPFlags(printCmd.Flags())
