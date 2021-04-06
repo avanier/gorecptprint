@@ -26,5 +26,6 @@ func Execute() {
 func init() {
 	viper.AutomaticEnv()
 
+	// rootCmd.AddCommand(testPrintCmd)
 	rootCmd.AddCommand(printCmd)
 }

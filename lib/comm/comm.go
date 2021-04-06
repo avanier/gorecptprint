@@ -1,8 +1,8 @@
 package comm
 
 import (
-	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/avanier/gorecptprint/lib/util"
@@ -33,6 +33,9 @@ const XOFF = 0x13
 // Exposed the global instance of the serial port.
 var Port serial.Port
 
+// PortMutex exposes whether the serial port is currently in use
+var PortMutex sync.Mutex
+
 // writeChunkSize is a tunable that allows to change the size of every write
 // loop
 var writeChunkSize uint
@@ -51,44 +54,92 @@ func Init() {
 	}
 
 	serial_port = viper.GetString("port")
-	fmt.Printf("using port %s\n", serial_port)
+	log.Printf("using port %s\n", serial_port)
 
 	Port, err = serial.Open(serial_port, mode)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	startFlowReader()
+	// startFlowReader()
+	recipientReady = true
 	resetPrinter()
-	disableTransparentXONXOFF()
+	// disableTransparentXONXOFF()
 }
 
 func displayResponse(resp []byte) {
 	Port.Read(resp)
 
-	fmt.Printf("response:\t %v\n", resp)
-	fmt.Printf("response:\t %X\n", resp)
+	log.Printf("response:\t %v\n", resp)
+	log.Printf("response:\t %X\n", resp)
 
 	for i, c := range resp {
-		fmt.Printf("byte %d: %2X %v\n", i, c, util.Bytes2Bits([]byte{c}))
+		log.Printf("byte %d: %2X %v\n", i, c, util.Bytes2Bits([]byte{c}))
 	}
 
-	fmt.Println(resp)
+	log.Println(resp)
 }
 
 // Check page 175
 
 // ExecuteCommand executes a command with an arbitrary byte payload.
 func ExecuteCommand(cmd []byte) {
-	fmt.Printf("executing:\t 0x%X\n", cmd)
+	// log.Printf("executing:\t 0x%X\n", cmd)
 	writeToPort(cmd)
+}
+
+func checkIfFull() {
+	var err error
+	var msb *serial.ModemStatusBits
+
+	// var buf = make([]byte, 1)
+
+	// _, err = Port.Read(buf)
+	// if err != nil {
+	// 	log.Fatal(err.Error())
+	// }
+
+	// for _, b := range buf {
+	// 	switch b {
+	// 	case XON:
+	// 		log.Println("received XON byte")
+	// 		if !recipientReady {
+	// 			log.Println("marking recipientReady as true")
+	// 			recipientReady = true
+	// 			go emitReadyToWrite()
+	// 		}
+	// 	case XOFF:
+	// 		log.Println("got XOFF byte, marking buffer full")
+	// 		recipientReady = false
+	// 	}
+	// }
+
+	// if !recipientReady {
+	// 	checkIfFull()
+	// }
+
+	// FML https://tldp.org/HOWTO/Serial-HOWTO-19.html
+	msb, err = Port.GetModemStatusBits()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	err = Port.SetRTS(true)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	if !msb.CTS {
+		time.Sleep(time.Millisecond * 5)
+		checkIfFull()
+	}
 }
 
 // UnsafeExecuteCommand sends a command directly to the printer without checking
 // the buffer status. This is useful for executing async commands (see p. xxx) or
 // for configuring the printer before the flow control system is enabled.
 func UnsafeExecuteCommand(cmd []byte) {
-	fmt.Printf("unsafely executing:\t 0x%X\n", cmd)
+	log.Printf("unsafely executing:\t 0x%X\n", cmd)
 	Port.Write(cmd)
 }
 
@@ -116,7 +167,9 @@ func writeToPort(cmd []byte) {
 		if !recipientReady {
 			_ = <-readyToWrite
 		}
-		Port.Write(dataChunks[i])
+
+		// Port.Write(dataChunks[i])
+		UnsafeExecuteCommand(dataChunks[i])
 	}
 }
 
@@ -138,7 +191,7 @@ func resetPrinter() {
 func WatchPrinterOutput() {
 	var err error
 	var i int
-	fmt.Println("watching printer output forever, 1 byte at a time")
+	log.Println("watching printer output forever, 1 byte at a time")
 
 	buf := make([]byte, 1)
 	c := -1
@@ -150,12 +203,12 @@ func WatchPrinterOutput() {
 			log.Fatal(err.Error())
 		}
 
-		fmt.Printf("[%6d]read %d byte: 0x%X\n", c, i, buf)
+		log.Printf("[%6d]read %d byte: 0x%X\n", c, i, buf)
 	}
 
 	// scanner := bufio.NewScanner(port)
 	// for scanner.Scan() {
-	// 	fmt.Println(scanner.Text()) // Println will add back the final '\n'
+	// 	log.Println(scanner.Text()) // Println will add back the final '\n'
 	// }
 	// if err := scanner.Err(); err != nil {
 	// 	log.Fatal(err)
@@ -197,6 +250,7 @@ func emitReadyToWrite() {
 	// to work again.
 	select {
 	case readyToWrite <- true:
+		log.Println("signaled to receiver channel that buffer is ready")
 		// If there is a receiver available for that message, yay.
 	default:
 		// Otherwise carry on.
@@ -205,8 +259,8 @@ func emitReadyToWrite() {
 
 func initReaderLoop() {
 	var err error
-	var buf = make([]byte, 1)
-	recipientReady = false
+	var buf = make([]byte, 8)
+	recipientReady = true
 
 	for {
 		_, err = Port.Read(buf)
@@ -217,11 +271,14 @@ func initReaderLoop() {
 		for _, b := range buf {
 			switch b {
 			case XON:
+				log.Println("received XON byte")
 				if !recipientReady {
+					log.Println("marking recipientReady as true")
 					recipientReady = true
 					go emitReadyToWrite()
 				}
 			case XOFF:
+				log.Println("got XOFF byte, marking buffer full")
 				recipientReady = false
 			}
 		}
