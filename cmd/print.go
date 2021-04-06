@@ -32,6 +32,10 @@ var printCmd = &cobra.Command{
 			var certData []byte
 			var pairs []certutil.KeyValuePair
 
+			if cert == "-" {
+				cert = "/dev/stdin"
+			}
+
 			certData, err = ioutil.ReadFile(cert)
 			if err != nil {
 				log.Fatal(err)
@@ -45,6 +49,8 @@ var printCmd = &cobra.Command{
 			for i := 0; i < len(pairs); i++ {
 				print.PrintTitleValues(pairs[i].Key, pairs[i].Value)
 			}
+
+			print.FeedPaper()
 
 			stringArray := util.SplitString(string(certData), 174)
 
@@ -102,13 +108,16 @@ var printCmd = &cobra.Command{
 
 			// Wrap up this one cert
 			print.FeedPaper()
-			if certNum > 0 && !viper.GetBool("no-cut") {
+			// If the cert's not the last and we didn't set the `--no-cut-between` flag
+			if certNum+1 != len(args) && !viper.GetBool("no-cut-between") {
 				print.CutPaper()
 			}
 		}
 
 		// Wrap up the whole operation
-		print.CutPaper()
+		if !viper.GetBool("no-cut-last") {
+			print.CutPaper()
+		}
 		print.PlayByeTune()
 	},
 }
@@ -119,7 +128,9 @@ func init() {
 
 	printCmd.PersistentFlags().String("port", defaultSerialPort, "serial port to use for communication")
 	printCmd.PersistentFlags().Uint("write-chunk-size", defaultWriteChunkSize, "the size in bytes of every chunk of data sent to the printer")
-	printCmd.PersistentFlags().Bool("no-cut", false, "cut the receipt between every certificate processed")
+	printCmd.PersistentFlags().Bool("no-cut-between", false, "don't cut the receipt between every certificate")
+	printCmd.PersistentFlags().Bool("no-cut-last", false, "don't cut the receipt after the last certificate")
+	printCmd.PersistentFlags().Bool("no-ident", false, "don't print information that could identify the machine where this was printed")
 
 	viper.BindPFlags(printCmd.PersistentFlags())
 	viper.BindPFlags(printCmd.Flags())

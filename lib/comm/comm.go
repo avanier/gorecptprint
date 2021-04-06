@@ -1,13 +1,14 @@
 package comm
 
 import (
+	"io"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/avanier/gorecptprint/lib/util"
+	"github.com/jacobsa/go-serial/serial"
 	"github.com/spf13/viper"
-	"go.bug.st/serial"
 )
 
 /*
@@ -31,7 +32,7 @@ const XON = 0x11
 const XOFF = 0x13
 
 // Exposed the global instance of the serial port.
-var Port serial.Port
+var Port io.ReadWriteCloser
 
 // PortMutex exposes whether the serial port is currently in use
 var PortMutex sync.Mutex
@@ -46,19 +47,34 @@ func Init() {
 	var serial_port string
 	writeChunkSize = viper.GetUint("write-chunk-size")
 
-	mode := &serial.Mode{
-		BaudRate: 19200,
-		DataBits: 8,
-		StopBits: serial.OneStopBit,
-		Parity:   serial.NoParity,
-	}
+	// mode := &serial.Mode{
+	// 	BaudRate: 19200,
+	// 	DataBits: 8,
+	// 	StopBits: serial.OneStopBit,
+	// 	Parity:   serial.NoParity,
+	// }
 
 	serial_port = viper.GetString("port")
+
+	options := serial.OpenOptions{
+		PortName:          serial_port,
+		BaudRate:          19200,
+		DataBits:          8,
+		StopBits:          1,
+		MinimumReadSize:   1,
+		RTSCTSFlowControl: true,
+	}
+
 	log.Printf("using port %s\n", serial_port)
 
-	Port, err = serial.Open(serial_port, mode)
+	// Port, err = serial.Open(serial_port, mode)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	Port, err = serial.Open(options)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("serial.Open: %v", err)
 	}
 
 	// startFlowReader()
@@ -88,52 +104,52 @@ func ExecuteCommand(cmd []byte) {
 	writeToPort(cmd)
 }
 
-func checkIfFull() {
-	var err error
-	var msb *serial.ModemStatusBits
+// func checkIfFull() {
+// 	var err error
+// 	var msb *serial.ModemStatusBits
 
-	// var buf = make([]byte, 1)
+// 	// var buf = make([]byte, 1)
 
-	// _, err = Port.Read(buf)
-	// if err != nil {
-	// 	log.Fatal(err.Error())
-	// }
+// 	// _, err = Port.Read(buf)
+// 	// if err != nil {
+// 	// 	log.Fatal(err.Error())
+// 	// }
 
-	// for _, b := range buf {
-	// 	switch b {
-	// 	case XON:
-	// 		log.Println("received XON byte")
-	// 		if !recipientReady {
-	// 			log.Println("marking recipientReady as true")
-	// 			recipientReady = true
-	// 			go emitReadyToWrite()
-	// 		}
-	// 	case XOFF:
-	// 		log.Println("got XOFF byte, marking buffer full")
-	// 		recipientReady = false
-	// 	}
-	// }
+// 	// for _, b := range buf {
+// 	// 	switch b {
+// 	// 	case XON:
+// 	// 		log.Println("received XON byte")
+// 	// 		if !recipientReady {
+// 	// 			log.Println("marking recipientReady as true")
+// 	// 			recipientReady = true
+// 	// 			go emitReadyToWrite()
+// 	// 		}
+// 	// 	case XOFF:
+// 	// 		log.Println("got XOFF byte, marking buffer full")
+// 	// 		recipientReady = false
+// 	// 	}
+// 	// }
 
-	// if !recipientReady {
-	// 	checkIfFull()
-	// }
+// 	// if !recipientReady {
+// 	// 	checkIfFull()
+// 	// }
 
-	// FML https://tldp.org/HOWTO/Serial-HOWTO-19.html
-	msb, err = Port.GetModemStatusBits()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+// 	// FML https://tldp.org/HOWTO/Serial-HOWTO-19.html
+// 	msb, err = Port.GetModemStatusBits()
+// 	if err != nil {
+// 		log.Fatal(err.Error())
+// 	}
 
-	err = Port.SetRTS(true)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+// 	err = Port.SetRTS(true)
+// 	if err != nil {
+// 		log.Fatal(err.Error())
+// 	}
 
-	if !msb.CTS {
-		time.Sleep(time.Millisecond * 5)
-		checkIfFull()
-	}
-}
+// 	if !msb.CTS {
+// 		time.Sleep(time.Millisecond * 5)
+// 		checkIfFull()
+// 	}
+// }
 
 // UnsafeExecuteCommand sends a command directly to the printer without checking
 // the buffer status. This is useful for executing async commands (see p. xxx) or
@@ -164,9 +180,9 @@ func writeToPort(cmd []byte) {
 	dataChunks := chunkData(cmd)
 
 	for i := 0; i <= len(dataChunks)-1; i++ {
-		if !recipientReady {
-			_ = <-readyToWrite
-		}
+		// if !recipientReady {
+		// 	_ = <-readyToWrite
+		// }
 
 		// Port.Write(dataChunks[i])
 		UnsafeExecuteCommand(dataChunks[i])
@@ -309,4 +325,13 @@ When printing graphics, be aware the print head prints 8 dots high at a time at
 
 The buffer size on 4610-TF6 is 64KiB
 See p.158
+*/
+
+/*
+
+Start read loop
+	if i was the last to use the port
+		wait for someone to write
+
+
 */

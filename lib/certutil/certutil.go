@@ -11,6 +11,7 @@ import (
 
 	"github.com/Showmax/go-fqdn"
 	"github.com/denisbrodbeck/machineid"
+	"github.com/spf13/viper"
 )
 
 // KeyValuePair is for poor people who can't affort tuples
@@ -27,13 +28,15 @@ func CertToKVPairs(certData []byte) ([]KeyValuePair, error) {
 
 	output = append(output, KeyValuePair{"PrintTime", time.Now().Format(time.RFC3339)})
 
-	output = append(output, KeyValuePair{"Hostname", fqdn.Get()})
+	if !viper.GetBool("no-ident") {
+		output = append(output, KeyValuePair{"Hostname", fqdn.Get()})
 
-	machineID, err := machineid.ID()
-	if err != nil {
-		log.Fatal(err)
+		machineID, err := machineid.ID()
+		if err != nil {
+			log.Fatal(err)
+		}
+		output = append(output, KeyValuePair{"MachineID", machineID})
 	}
-	output = append(output, KeyValuePair{"MachineID", machineID})
 
 	pemCert, _ := pem.Decode(certData)
 
